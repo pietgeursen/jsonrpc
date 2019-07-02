@@ -50,17 +50,24 @@ impl ServerBuilder {
 	/// per line and each response is written to STDOUT on a new line.
 	pub fn build(&self) {
 		let stdin = tokio_stdin_stdout::stdin(0);
-		let stdout = tokio_stdin_stdout::stdout(0).make_sendable();
+		//let stdout = tokio_stdin_stdout::stdout(0).make_sendable();
 
 		let framed_stdin = FramedRead::new(stdin, LinesCodec::new());
-		let framed_stdout = FramedWrite::new(stdout, LinesCodec::new());
+		//let framed_stdout = FramedWrite::new(stdout, LinesCodec::new());
 
 		let handler = self.handler.clone();
 		let future = framed_stdin
-			.and_then(move |line| process(&handler, line).map_err(|_| unreachable!()))
-			.forward(framed_stdout)
-			.map(|_| ())
-			.map_err(|e| panic!("{:?}", e));
+			.map_err(|e| panic!("{:?}", e))
+			.for_each(move |line| {
+                            let f = process(&handler, line)
+                                .map_err(|_| unreachable!())
+                                .map(|s|println!("{}", s));
+
+
+                            tokio::spawn(f)
+                        });
+			//.map(|_| ())
+			//.map_err(|e| panic!("{:?}", e));
 
 		tokio::run(future);
 	}
