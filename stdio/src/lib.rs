@@ -17,6 +17,7 @@
 
 #![warn(missing_docs)]
 
+use std::io::Write;
 use tokio;
 use tokio_stdin_stdout;
 #[macro_use]
@@ -27,7 +28,7 @@ pub use jsonrpc_core;
 use jsonrpc_core::IoHandler;
 use std::sync::Arc;
 use tokio::prelude::{Future, Stream};
-use tokio_codec::{FramedRead, FramedWrite, LinesCodec};
+use tokio_codec::{FramedRead, LinesCodec};
 
 /// Stdio server builder
 pub struct ServerBuilder {
@@ -50,26 +51,22 @@ impl ServerBuilder {
 	/// per line and each response is written to STDOUT on a new line.
 	pub fn build(&self) {
 		let stdin = tokio_stdin_stdout::stdin(0);
-		//let stdout = tokio_stdin_stdout::stdout(0).make_sendable();
 
 		let framed_stdin = FramedRead::new(stdin, LinesCodec::new());
-		//let framed_stdout = FramedWrite::new(stdout, LinesCodec::new());
 
 		let handler = self.handler.clone();
 		let future = framed_stdin
-			.map_err(|e| panic!("{:?}", e))
-			.for_each(move |line| {
-                            let f = process(&handler, line)
-                                .map_err(|_| unreachable!())
-                                .map(|s|println!("{}", s));
+                    .map_err(|e| panic!("{:?}", e))
+                    .for_each(move |line| {
+			let f = process(&handler, line)
+                            .map(|s| {
+                                println!("{}", s);
+                            });
 
+			tokio::spawn(f)
+                    });
 
-                            tokio::spawn(f)
-                        });
-			//.map(|_| ())
-			//.map_err(|e| panic!("{:?}", e));
-
-		tokio::run(future);
+                tokio::run(future);
 	}
 }
 
